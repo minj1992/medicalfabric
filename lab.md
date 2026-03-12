@@ -1,67 +1,58 @@
 # Lab: Fabric Data Ingestion from ADLS Gen2 with Auto-Trigger
 
-This lab guide explains how to set up an automated data ingestion pipeline in Microsoft Fabric that triggers whenever new data is uploaded to an Azure Data Lake Storage (ADLS) Gen2 account.
+This lab guide explains how to set up an automated data ingestion pipeline in Microsoft Fabric that triggers whenever new data is uploaded to your Azure Data Lake Storage (ADLS) Gen2 account.
 
-## Architecture Diagram
+## 1. Architecture Diagram
 
 ```text
 +-------------------------+       +----------------------------+       +-------------------------+
 |  Azure Data Lake Gen2   | ----> |  Fabric Storage Event      | ----> |  Fabric Data Factory    |
-|  (Blob Storage Source)  |       |  Trigger (Auto-Trigger)    |       |  Pipeline (Ingestion)   |
+|  (Account: testingminjdemo) |   |  Trigger (Auto-Trigger)    |       |  Pipeline (Ingestion)   |
 +-----------+-------------+       +-------------+--------------+       +------------+------------+
             |                                   |                                   |
             | (New File Uploaded)               | (Starts Pipeline)                 | (Loads Data)
             v                                   v                                   v
-    [ raw_data/*.csv ]                  [ Trigger Event ]                   [ Fabric Lakehouse ]
+    [ raw_data/2023.csv ]               [ Trigger Event ]                   [ Fabric Lakehouse ]
 ```
 
-## 1. Prerequisites & Sample Data
-
-The project uses the **CMS Medicare Part D Prescribers** dataset.
+## 2. Prerequisites & Sample Data
 
 - **Storage Container Name**: `testingminjdemo`
-- **Data Source Link**: [CMS Medicare Part D Dataset](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug)
-- **Direct Metadata API**: `https://data.cms.gov/data.json`
+- **Sample Data**: Rename your CMS Medicare Part D CSV file to `2023.csv`.
+- **Target Location**: `abfss://testingminjdemo@testingminjdemo.dfs.core.windows.net/raw_data/2023.csv`
 
-## 2. Setup Azure ADLS Gen2 in Azure Portal
+## 3. Setup Azure ADLS Gen2 (Azure Portal)
 
-1.  **Create Storage Account**:
-    - Sign in to [Azure Portal](https://portal.azure.com).
-    - Search for **Storage accounts** and click **Create**.
-    - Select your Subscription and Resource Group.
-    - Provide a unique **Storage account name**.
-    - **Crucial**: Go to the **Advanced** tab and check **Enable hierarchical namespace** (this turns Blob Storage into ADLS Gen2).
-    - Click **Review + create** then **Create**.
+1.  **Storage Account**: Ensure "Hierarchical namespace" is **Enabled** in the Advanced tab.
+2.  **Container**: Create a container named `testingminjdemo`.
+3.  **Upload**: 
+    - Create a folder named `raw_data/`.
+    - Upload your renamed `2023.csv` file here.
+4.  **Permissions**: Assign **Storage Blob Data Reader** to your Fabric Workspace identity in IAM settings.
 
-2.  **Create Container**:
-    - Go to your new Storage Account resource.
-    - Select **Containers** under Data storage.
-    - Click **+ Container**, name it `testingminjdemo`, and set Access level to `Private`.
+## 4. How to Setup Quick Install (Fabric)
 
-3.  **Upload Data**:
-    - Inside the container, create a folder named `raw_data/`.
-    - Rename your downloaded CSV to `2023.csv`.
-    - Upload `2023.csv` to the `raw_data/` folder.
+To deploy the entire solution automatically, follow these steps in your Fabric Workspace:
 
-## 3. Fully Automated Quick Install
+1.  **Import Notebook**:
+    - Download `install_cms_demo.ipynb` from your GitHub.
+    - In your Fabric Workspace, click **Import** > **Notebook** and upload the file.
 
-To use the updated **Quick Install** that pulls from your Blob Storage:
-
-1.  **Configure Permissions**:
-    - Assign the **Storage Blob Data Reader** role to your **Fabric Workspace Identity** or your own account in the Azure Storage IAM settings.
-
-2.  **Update Ingestion Notebook**:
-    - Open `01-IngestFromBlob.ipynb` in your Fabric Workspace.
-    - Set the `storage_account_name` variable in the first code cell to your Azure Storage Account name.
+2.  **Verify Ingestion Notebook**:
+    - Ensure `01-IngestFromBlob.ipynb` is also imported.
+    - This notebook is already pre-configured with your storage account name and key to ensure it works immediately.
 
 3.  **Run Quick Install**:
-    - Run the `install_cms_demo.ipynb` notebook. It will now:
-        - Create the Lakehouse.
-        - Import the notebooks (including the new Blob Ingestion one).
-        - Create a Pipeline that triggers the Blob Ingestion, followed by the Silver and Gold layer processing.
+    - Open the `install_cms_demo.ipynb` notebook.
+    - Click **Run All** in the top toolbar.
+    - **What happens next?**
+        - Fabric will create the Lakehouse environment.
+        - It will deploy the Silver and Gold layer transformation notebooks.
+        - It will create and trigger the Data Factory pipeline.
+        - The pipeline will pull `2023.csv` from your blob storage and build the Star Schema.
 
-## 4. How Auto-Trigger Works
+## 5. Auto-Trigger Mechanism
 
-- **Event Grid Integration**: Azure Blob Storage (Gen2) uses Azure Event Grid to notify Fabric when a "Blob Created" event occurs.
-- **Immediate Execution**: As soon as a file is uploaded to the specified container/path, Fabric receives the event and starts the pipeline.
-- **Incremental Loading**: You can configure the pipeline to only pick up the file that triggered the event by using pipeline parameters (e.g., `@trigger().outputs.body.fileName`).
+- **Event Grid**: Azure Blob Storage notifies Fabric of the "Blob Created" event.
+- **Immediate Action**: The pipeline starts as soon as a new file lands in `raw_data/`.
+- **Status Monitoring**: You can monitor the progress in the **Monitoring Hub** of your Fabric workspace.
