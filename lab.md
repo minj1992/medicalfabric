@@ -17,42 +17,57 @@ This lab guide explains how to set up an automated data ingestion pipeline in Mi
 
 ## 2. Prerequisites & Sample Data
 
+- **Sample Data Download**: [CMS Medicare Part D Prescribers (2023)](https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers/medicare-part-d-prescribers-by-provider-and-drug)
+- **File Name**: Download the CSV file and rename it to `2023.csv`.
 - **Storage Container Name**: `testingminjdemo`
-- **Sample Data**: Rename your CMS Medicare Part D CSV file to `2023.csv`.
 - **Target Location**: `abfss://testingminjdemo@testingminjdemo.dfs.core.windows.net/raw_data/2023.csv`
 
-## 3. Setup Azure ADLS Gen2 (Azure Portal)
+## 3. Steps to Create Azure Blob Storage Gen2 (Azure UI)
 
-1.  **Storage Account**: Ensure "Hierarchical namespace" is **Enabled** in the Advanced tab.
-2.  **Container**: Create a container named `testingminjdemo`.
-3.  **Upload**: 
-    - Create a folder named `raw_data/`.
-    - Upload your renamed `2023.csv` file here.
-4.  **Permissions**: Assign **Storage Blob Data Reader** to your Fabric Workspace identity in IAM settings.
+1.  **Search for Storage Accounts**: Log in to the Azure Portal and search for **Storage Accounts**.
+2.  **Create New Account**:
+    - **Basics**: Select your Subscription, Resource Group, and Name (e.g., `testingminjdemo`).
+    - **Advanced**: Ensure **Enable hierarchical namespace** is **Checked** (this makes it Gen2).
+    - **Review + Create**: Click create and wait for deployment.
+3.  **Create Container**:
+    - Go to your storage account, click **Data storage** > **Containers**.
+    - Click **+ Container** and name it `testingminjdemo`.
+4.  **Upload Sample Data**:
+    - Inside the container, click **+ Folder** and name it `raw_data`.
+    - Open `raw_data`, click **Upload**, and select your `2023.csv` file.
+5.  **Get Access Key**:
+    - Go to **Security + networking** > **Access keys**.
+    - Copy **Key 1** (this is already configured in your ingestion notebook).
 
-## 4. How to Setup Quick Install (Fabric)
+## 4. Quick Install Demo Setup (Fabric)
 
-To deploy the entire solution automatically, follow these steps in your Fabric Workspace:
+This solution uses the following files from your GitHub repository `minj1992/medicalfabric`:
 
-1.  **Import Notebook**:
-    - Download `install_cms_demo.ipynb` from your GitHub.
-    - In your Fabric Workspace, click **Import** > **Notebook** and upload the file.
+- **install_cms_demo.ipynb**: The main automation notebook that creates your workspace artifacts.
+- **create_ingestion_pipeline.ipynb**: Automates the creation of the Data Factory pipeline.
+- **01-IngestFromBlob.ipynb**: The core ingestion logic using your `testingminjdemo` account.
 
-2.  **Verify Ingestion Notebook**:
-    - Ensure `01-IngestFromBlob.ipynb` is also imported.
-    - This notebook is already pre-configured with your storage account name and key to ensure it works immediately.
+**Steps to Run**:
 
-3.  **Run Quick Install**:
-    - Open the `install_cms_demo.ipynb` notebook.
-    - Click **Run All** in the top toolbar.
-    - **What happens next?**
-        - Fabric will create the Lakehouse environment.
-        - It will deploy the Silver and Gold layer transformation notebooks.
-        - It will create and trigger the Data Factory pipeline.
-        - The pipeline will pull `2023.csv` from your blob storage and build the Star Schema.
+1.  **Import & Open**: Import `install_cms_demo.ipynb` into your Fabric Workspace.
+2.  **Configuration**: Update the `storage_account_key` in the configuration cell if you regenerated it.
+3.  **Run All**: Click **Run All**. It will:
+    - Create a Lakehouse named `cms_lakehouse`.
+    - Import all 3 notebooks from your GitHub.
+    - Create a Data Pipeline `cms_ingestion_pipeline`.
+    - Trigger the pipeline to start data loading.
 
-## 5. Auto-Trigger Mechanism
+## 5. Auto-Trigger Configuration
 
-- **Event Grid**: Azure Blob Storage notifies Fabric of the "Blob Created" event.
-- **Immediate Action**: The pipeline starts as soon as a new file lands in `raw_data/`.
-- **Status Monitoring**: You can monitor the progress in the **Monitoring Hub** of your Fabric workspace.
+To make the pipeline trigger automatically when you update data in Blob Storage:
+
+1.  **Open Pipeline**: Open `cms_ingestion_pipeline` in Fabric.
+2.  **Add Trigger**: Click **Trigger** > **New/Edit** > **New**.
+3.  **Event-Based Trigger**:
+    - **Type**: Select **Storage events**.
+    - **Storage Account**: Select your Azure subscription and `testingminjdemo` storage account.
+    - **Container**: `testingminjdemo`.
+    - **Blob path begins with**: `raw_data/`.
+    - **Blob path ends with**: `.csv`.
+    - **Event**: Select **Blob created**.
+4.  **Publish**: Click **OK** and then **Publish** the pipeline. Now, any file upload to `raw_data/` will start the ingestion.
